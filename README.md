@@ -14,7 +14,29 @@ NVIDIA GPU Docker run:
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 ```
 
-GPU mode requires Docker with NVIDIA GPU support enabled. If that is not available, use the CPU-only command.
+GPU mode requires:
+
+- an NVIDIA GPU with current NVIDIA drivers
+- Docker Desktop or Docker Engine
+- NVIDIA Container Toolkit / NVIDIA GPU support enabled for Docker
+
+Before running the app, verify Docker can see the GPU:
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+```
+
+If `nvidia-smi` prints the GPU table, run:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+```
+
+If Docker cannot see the GPU, use the CPU-only command instead:
+
+```bash
+docker compose up --build
+```
 
 Open:
 
