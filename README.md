@@ -2,9 +2,19 @@
 
 ## Quick Start
 
+CPU-only Docker run:
+
 ```bash
 docker compose up --build
 ```
+
+NVIDIA GPU Docker run:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+```
+
+GPU mode requires Docker with NVIDIA GPU support enabled. If that is not available, use the CPU-only command.
 
 Open:
 
@@ -12,7 +22,21 @@ Open:
 http://localhost:8501
 ```
 
-Default mode is `mock`, so the project can run without an API key.
+The Compose setup starts three services:
+
+```text
+ollama      local LLM server
+ollama-pull downloads qwen3:8b into a persistent Docker volume
+text2stl    Streamlit app
+```
+
+The first run can take a while because Docker downloads the images and Ollama pulls the 5.2 GB Qwen3 model. Later runs reuse the cached model.
+
+To stop:
+
+```bash
+docker compose down
+```
 
 ## What It Does
 
@@ -81,6 +105,8 @@ Make a simple pencil holder with six circular holes.
 ## Run Locally With Ollama
 
 This project is configured for a local OpenAI-compatible Ollama server using Qwen3 8B.
+
+For most users, Docker Compose is easier because it starts both Ollama and the app. Use this manual local setup only if you want to run Ollama and Streamlit directly on Windows.
 
 On this setup, Ollama is installed under:
 
