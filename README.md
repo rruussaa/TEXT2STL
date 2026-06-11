@@ -276,6 +276,28 @@ The CSV columns are:
 id,mode,json_valid,code_safe,stl_generated,validation_pass,repair_attempts,time_sec,warnings,error
 ```
 
+## Fine-Tuning Data
+
+The UI can save user ratings and feedback for generated models. Feedback is written to:
+
+```text
+outputs/feedback/feedback.jsonl
+```
+
+To prepare supervised fine-tuning data from accepted UI feedback:
+
+```bash
+python training/prepare_sft_dataset.py --feedback outputs/feedback/feedback.jsonl --out training/out/feedback_sft.jsonl --min-rating 4
+```
+
+To prepare supervised fine-tuning data from a curated dataset:
+
+```bash
+python training/prepare_sft_dataset.py --dataset training/example_dataset.jsonl --out training/out/curated_sft.jsonl --min-rating 4
+```
+
+See `training/README.md` for the two training workflows.
+
 ## STL Validation
 
 Each generated STL is checked with `trimesh` for:

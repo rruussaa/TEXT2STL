@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sys
+import re
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
@@ -15,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import streamlit as st
 
 from app.config import get_settings
+from app.feedback import save_generation_feedback
 from app.pipeline import run_experimental_pipeline, run_stable_pipeline
 from app.stl_preview import build_stl_preview_figure
 
@@ -82,6 +84,31 @@ def _ollama_runtime_status(llm_base_url: str, configured_accelerator: str) -> st
 
 def _set_prompt(prompt: str) -> None:
     st.session_state["prompt"] = prompt
+
+
+def _feedback_key(result: dict) -> str:
+    value = str(result.get("output_path") or result.get("prompt") or "latest")
+    return re.sub(r"[^a-zA-Z0-9_-]+", "_", value)[-80:]
+
+
+def _show_feedback_form(result: dict, output_dir: Path) -> None:
+    st.subheader("User rating")
+    default_training = bool(result.get("success") and result.get("validation_pass"))
+    with st.form(f"feedback_{_feedback_key(result)}"):
+        rating = st.slider("Rating", min_value=1, max_value=5, value=4 if default_training else 3)
+        notes = st.text_area("Feedback", placeholder="What should be better about this STL?")
+        accepted = st.checkbox("Use as training example", value=default_training)
+        submitted = st.form_submit_button("Save rating", use_container_width=True)
+
+    if submitted:
+        record = save_generation_feedback(
+            result=result,
+            rating=rating,
+            notes=notes,
+            accepted_for_training=accepted,
+            output_dir=output_dir,
+        )
+        st.success(f"Saved rating {record['id']}")
 
 
 def _show_download(path_value: str | None) -> None:
@@ -437,6 +464,8 @@ def main() -> None:
     with download:
         st.subheader("STL file")
         _show_download(result.get("output_path"))
+
+    _show_feedback_form(result, settings.output_dir)
 
     if result.get("attempts"):
         st.subheader("Repair attempts")
