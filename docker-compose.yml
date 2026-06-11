@@ -12,7 +12,8 @@ services:
       - ollama
     environment:
       - OLLAMA_HOST=http://ollama:11434
-    command: ["sh", "-c", "until ollama list >/dev/null 2>&1; do sleep 2; done; ollama pull ${LLM_MODEL:-qwen3:8b}"]
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["until ollama list >/dev/null 2>&1; do sleep 2; done; ollama pull ${LLM_MODEL:-qwen3:8b}"]
     volumes:
       - ollama-models:/root/.ollama
 
@@ -30,6 +31,12 @@ services:
       - LLM_BASE_URL=http://ollama:11434/v1
       - LLM_API_KEY=ollama
       - LLM_MODEL=${LLM_MODEL:-qwen3:8b}
+      - LLM_ACCELERATOR=cpu
+      - LLM_TIMEOUT_SEC=${LLM_TIMEOUT_SEC:-180}
+      - LLM_COMPACT_GENERATION=${LLM_COMPACT_GENERATION:-true}
+      - LLM_EXPERIMENTAL_MAX_TOKENS=${LLM_EXPERIMENTAL_MAX_TOKENS:-600}
+      - LLM_REPAIR_MAX_TOKENS=${LLM_REPAIR_MAX_TOKENS:-450}
+      - LLM_MAX_REPAIRS=${LLM_MAX_REPAIRS:-2}
       - OUTPUT_DIR=/app/outputs
     volumes:
       - ./outputs:/app/outputs

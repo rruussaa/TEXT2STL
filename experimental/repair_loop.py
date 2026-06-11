@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.llm_client import LLMClient
+from app.validator import validate_stl, validation_passed
 from experimental.cadquery_agent import generate_cadquery_code, repair_cadquery_code
 from experimental.quality import assess_code_quality
 from experimental.sandbox_runner import run_cadquery_code
@@ -30,13 +31,30 @@ def _run_attempt(
 ) -> tuple[dict, dict, bool]:
     run_result = run_cadquery_code(code, output_path, timeout_sec=timeout_sec)
     quality = {"ok": False, "issues": [], "template_name": None}
+    validation = {}
+    validation_ok = False
     if run_result.get("success"):
         quality = assess_code_quality(user_prompt, code)
+        validation = validate_stl(run_result.get("output_path", output_path))
+        validation_ok = validation_passed(validation)
 
-    success = bool(run_result.get("success") and quality.get("ok"))
+    success = bool(run_result.get("success") and quality.get("ok") and validation_ok)
     traceback_text = run_result.get("traceback", "")
     if run_result.get("success") and not quality.get("ok"):
         traceback_text = "Quality check failed: " + "; ".join(quality.get("issues", []))
+    elif run_result.get("success") and not validation_ok:
+        warnings = "; ".join(validation.get("warnings", [])) or "STL validation failed"
+        traceback_text = (
+            "STL validation failed. "
+            f"Warnings: {warnings}. "
+            f"Bounds mm: {validation.get('bounds_mm')}. "
+            f"Volume mm3: {validation.get('volume_mm3')}. "
+            f"Watertight: {validation.get('is_watertight')}. "
+            "Do not repeat the same geometry. Replace it with a single connected watertight solid. "
+            "Make every unioned part overlap another part by at least 2 mm. "
+            "Avoid separated or barely touching cylinders/spheres. "
+            "For humans or characters, use a blocky torso with overlapping box limbs and an overlapping head."
+        )
 
     attempt = {
         "attempt": attempt_index,
@@ -49,6 +67,8 @@ def _run_attempt(
         "quality_ok": bool(quality.get("ok")),
         "quality_issues": quality.get("issues", []),
         "template_name": quality.get("template_name"),
+        "validation_pass": validation_ok,
+        "validation": validation,
         "traceback": traceback_text,
     }
     return attempt, run_result, success
@@ -74,9 +94,9 @@ def run_with_repair_loop(
             template=True,
         )
         attempts.append(attempt)
-        if success or run_result.get("success"):
+        if success:
             return {
-                "success": bool(run_result.get("success")),
+                "success": True,
                 "output_path": run_result.get("output_path", output_path),
                 "code": template_code,
                 "attempts": attempts,
@@ -106,6 +126,8 @@ def run_with_repair_loop(
                     "quality_ok": False,
                     "quality_issues": [],
                     "template_name": None,
+                    "validation_pass": False,
+                    "validation": {},
                     "traceback": error,
                 }
             ],
@@ -158,6 +180,8 @@ def run_with_repair_loop(
                     "quality_ok": False,
                     "quality_issues": [],
                     "template_name": None,
+                    "validation_pass": False,
+                    "validation": {},
                     "traceback": _llm_error_message(exc),
                 }
             )
@@ -174,9 +198,9 @@ def run_with_repair_loop(
             template=True,
         )
         attempts.append(attempt)
-        if success or run_result.get("success"):
+        if success:
             return {
-                "success": bool(run_result.get("success")),
+                "success": True,
                 "output_path": run_result.get("output_path", output_path),
                 "code": template_code,
                 "attempts": attempts,

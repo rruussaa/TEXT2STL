@@ -3,6 +3,7 @@ Generate CadQuery Python code for a simple, recognizable 3D printable model from
 Return only Python code.
 No Markdown.
 No explanations.
+Do not include thinking text, comments before the code, or Markdown fences.
 
 The code must define exactly this function:
 
@@ -19,6 +20,10 @@ Core behavior:
 - Do not return a generic box, cylinder, or cube unless the user asked for that primitive.
 - Keep dimensions modest: usually 10 to 120 mm. Minimum wall thickness should be about 2 mm.
 - Prefer robust primitives: box, circle/extrude, loft, revolve, union, cut, translate, rotate.
+- Make one connected watertight solid, not separate touching/floating pieces.
+- Every unioned part must overlap another part by at least 2 mm; do not rely on faces or edges merely touching.
+- Avoid long loose cylinders and spheres for limbs unless they clearly intersect the body volume.
+- Prefer blocky overlapping boxes for stylized figures when that is more reliable.
 - Do not use .mirror(); create left/right or front/back symmetric parts explicitly with translate().
 - Use millimeters.
 
@@ -32,10 +37,12 @@ Object guidance:
 - Pencil holder: base or cylinder with several vertical holes.
 - Box/tray: hollow container with visible walls.
 - Robot/person: body, head, arms, legs.
+- Human/person: blocky torso, head, two arms, two legs. Use overlapping boxes/capsules, keep total height below 170 mm, and make all limbs intersect the torso.
 - House: base block, roof, door, windows.
 
 Rules:
 - Put imports inside build_model(), not at top level.
+- Define build_model() at top level. If helper logic is needed, define helper functions above it.
 - The final variable must be named model.
 - Return a CadQuery Workplane or Shape-compatible object.
 - Avoid very thin walls.

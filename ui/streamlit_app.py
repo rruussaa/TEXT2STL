@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
+import re
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -12,6 +16,7 @@ if str(PROJECT_ROOT) not in sys.path:
 import streamlit as st
 
 from app.config import get_settings
+from app.feedback import save_generation_feedback
 from app.pipeline import run_experimental_pipeline, run_stable_pipeline
 from app.stl_preview import build_stl_preview_figure
 
@@ -34,8 +39,76 @@ EXPERIMENTAL_EXAMPLES = [
 ]
 
 
+def _ollama_api_base(llm_base_url: str) -> str | None:
+    base_url = llm_base_url.rstrip("/")
+    if base_url.endswith("/v1"):
+        return base_url[:-3]
+    if "11434" in base_url:
+        return base_url
+    return None
+
+
+def _format_bytes(value: int) -> str:
+    if value <= 0:
+        return "0 B"
+    units = ("B", "KB", "MB", "GB")
+    size = float(value)
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
+        size /= 1024
+    return f"{size:.1f} GB"
+
+
+@st.cache_data(ttl=5, show_spinner=False)
+def _ollama_runtime_status(llm_base_url: str, configured_accelerator: str) -> str:
+    configured = configured_accelerator.upper() if configured_accelerator else "UNKNOWN"
+    api_base = _ollama_api_base(llm_base_url)
+    if not api_base:
+        return f"configured {configured}"
+
+    try:
+        with urlopen(f"{api_base}/api/ps", timeout=2.0) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return f"configured {configured}; Ollama status unavailable"
+
+    models = payload.get("models") or []
+    if not models:
+        return f"configured {configured}; no model loaded yet"
+
+    vram_bytes = sum(int(model.get("size_vram") or 0) for model in models)
+    active = "GPU active" if vram_bytes > 0 else "CPU active"
+    return f"{active}; configured {configured}; VRAM {_format_bytes(vram_bytes)}"
+
+
 def _set_prompt(prompt: str) -> None:
     st.session_state["prompt"] = prompt
+
+
+def _feedback_key(result: dict) -> str:
+    value = str(result.get("output_path") or result.get("prompt") or "latest")
+    return re.sub(r"[^a-zA-Z0-9_-]+", "_", value)[-80:]
+
+
+def _show_feedback_form(result: dict, output_dir: Path) -> None:
+    st.subheader("User rating")
+    default_training = bool(result.get("success") and result.get("validation_pass"))
+    with st.form(f"feedback_{_feedback_key(result)}"):
+        rating = st.slider("Rating", min_value=1, max_value=5, value=4 if default_training else 3)
+        notes = st.text_area("Feedback", placeholder="What should be better about this STL?")
+        accepted = st.checkbox("Use as training example", value=default_training)
+        submitted = st.form_submit_button("Save rating", use_container_width=True)
+
+    if submitted:
+        record = save_generation_feedback(
+            result=result,
+            rating=rating,
+            notes=notes,
+            accepted_for_training=accepted,
+            output_dir=output_dir,
+        )
+        st.success(f"Saved rating {record['id']}")
 
 
 def _show_download(path_value: str | None) -> None:
@@ -306,6 +379,7 @@ def main() -> None:
     with header_text:
         st.title("TEXT2STL Model")
         st.caption(f"LLM mode: {settings.llm_mode} | model: {settings.llm_model}")
+        st.caption(f"Runtime: {_ollama_runtime_status(settings.llm_base_url, settings.llm_accelerator)}")
     with header_photo:
         if header_image_path:
             st.image(str(header_image_path), width=130)
@@ -391,13 +465,24 @@ def main() -> None:
         st.subheader("STL file")
         _show_download(result.get("output_path"))
 
+    _show_feedback_form(result, settings.output_dir)
+
     if result.get("attempts"):
         st.subheader("Repair attempts")
         for attempt in result["attempts"]:
             suffix = "template" if attempt.get("template") else ("repair" if attempt.get("repair") else "llm")
             label = f"Attempt {attempt['attempt']} ({suffix}) - {'success' if attempt['success'] else 'failed'}"
             with st.expander(label, expanded=not attempt["success"]):
-                st.write({"code_safe": attempt.get("code_safe"), "safety_errors": attempt.get("safety_errors", []), "quality_ok": attempt.get("quality_ok"), "quality_issues": attempt.get("quality_issues", [])})
+                st.write(
+                    {
+                        "code_safe": attempt.get("code_safe"),
+                        "safety_errors": attempt.get("safety_errors", []),
+                        "quality_ok": attempt.get("quality_ok"),
+                        "quality_issues": attempt.get("quality_issues", []),
+                        "validation_pass": attempt.get("validation_pass"),
+                        "validation_warnings": attempt.get("validation", {}).get("warnings", []),
+                    }
+                )
                 st.code(attempt.get("code", ""), language="python")
                 if attempt.get("traceback"):
                     st.code(attempt["traceback"], language="text")

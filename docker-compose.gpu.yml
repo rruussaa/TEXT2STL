@@ -2,3 +2,11 @@ services:
   ollama:
     gpus: all
 
+  text2stl:
+    environment:
+      - LLM_ACCELERATOR=gpu
+      - LLM_TIMEOUT_SEC=120
+      - LLM_COMPACT_GENERATION=false
+      - LLM_EXPERIMENTAL_MAX_TOKENS=900
+      - LLM_REPAIR_MAX_TOKENS=900
+      - LLM_MAX_REPAIRS=4

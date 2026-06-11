@@ -32,8 +32,8 @@ def check_code_safety(code: str) -> dict:
         return {"safe": False, "errors": [f"SyntaxError: {exc}"]}
 
     function_names = [node.name for node in tree.body if isinstance(node, ast.FunctionDef)]
-    if function_names != ["build_model"]:
-        errors.append("Code must define exactly one top-level function named build_model.")
+    if "build_model" not in function_names:
+        errors.append("Code must define a top-level function named build_model.")
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):

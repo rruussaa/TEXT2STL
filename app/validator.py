@@ -81,3 +81,14 @@ def validate_stl(path: str, printer_bounds: Sequence[float] = (256, 256, 256)) -
         "path": str(stl_path),
     }
 
+
+def validation_passed(report: dict) -> bool:
+    return bool(
+        report.get("file_exists")
+        and report.get("file_size_bytes", 0) > 0
+        and report.get("triangle_count", 0) > 0
+        and report.get("volume_mm3", 0) > 0
+        and report.get("fits_printer")
+        and not report.get("warnings")
+    )
+

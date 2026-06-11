@@ -4,9 +4,20 @@ from __future__ import annotations
 
 import json
 import re
+import ast
 from dataclasses import dataclass
 
 from app.config import Settings, get_settings, read_prompt
+
+
+COMPACT_GENERATION_INSTRUCTIONS = """
+
+Compact generation:
+- Keep the code compact: no more than 80 lines.
+- For complex landmarks or organic objects, make a simplified, recognizable part-based approximation.
+- Prefer a successful simple STL over intricate geometry that may fail.
+- For humans, animals, or characters, use connected overlapping blocky parts instead of separated cylinders/spheres.
+"""
 
 
 @dataclass
@@ -27,7 +38,15 @@ class LLMClient:
         if self.settings.llm_mode == "mock":
             return mock_experimental_code(user_prompt)
         system_prompt = read_prompt("experimental_cadquery_prompt.md")
-        return strip_code_fences(self._complete(system_prompt, user_prompt, max_tokens=900))
+        if self.settings.llm_compact_generation:
+            system_prompt += COMPACT_GENERATION_INSTRUCTIONS
+        return strip_code_fences(
+            self._complete(
+                system_prompt,
+                user_prompt,
+                max_tokens=self.settings.llm_experimental_max_tokens,
+            )
+        )
 
     def repair_code(self, user_prompt: str, traceback_text: str, previous_code: str) -> str:
         if self.settings.llm_mode == "mock":
@@ -37,7 +56,13 @@ class LLMClient:
             traceback=traceback_text,
         )
         user_message = "Previous code:\n" + previous_code
-        return strip_code_fences(self._complete(system_prompt, user_message, max_tokens=900))
+        return strip_code_fences(
+            self._complete(
+                system_prompt,
+                user_message,
+                max_tokens=self.settings.llm_repair_max_tokens,
+            )
+        )
 
     def _complete(self, system_prompt: str, user_prompt: str, max_tokens: int) -> str:
         if self.settings.llm_mode != "openai_compatible":
@@ -48,7 +73,7 @@ class LLMClient:
         client = OpenAI(
             api_key=self.settings.llm_api_key,
             base_url=self.settings.llm_base_url,
-            timeout=120.0,
+            timeout=self.settings.llm_timeout_sec,
         )
         response = client.chat.completions.create(
             model=self.settings.llm_model,
@@ -64,11 +89,40 @@ class LLMClient:
 
 
 def strip_code_fences(text: str) -> str:
-    cleaned = text.strip()
-    if cleaned.startswith("```"):
-        cleaned = re.sub(r"^```(?:python)?\s*", "", cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(r"\s*```$", "", cleaned)
+    cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.IGNORECASE | re.DOTALL).strip()
+    fenced_blocks = re.findall(r"```(?:[a-zA-Z0-9_+-]+)?\s*(.*?)```", cleaned, flags=re.DOTALL)
+    candidates = sorted(fenced_blocks, key=lambda block: "def build_model" not in block)
+    candidates.append(cleaned)
+
+    for candidate in candidates:
+        extracted = _extract_parseable_python(candidate)
+        if extracted:
+            return extracted
     return cleaned.strip()
+
+
+def _extract_parseable_python(text: str) -> str:
+    lines = text.strip().splitlines()
+    start_indexes = [0]
+    start_indexes.extend(
+        index
+        for index, line in enumerate(lines)
+        if re.match(r"^\s*(?:def|import|from)\s+", line)
+    )
+
+    for start_index in dict.fromkeys(start_indexes):
+        candidate_lines = lines[start_index:]
+        for end_index in range(len(candidate_lines), 0, -1):
+            candidate = "\n".join(candidate_lines[:end_index]).strip()
+            if not candidate:
+                continue
+            try:
+                tree = ast.parse(candidate)
+            except SyntaxError:
+                continue
+            if any(isinstance(node, ast.FunctionDef) and node.name == "build_model" for node in tree.body):
+                return candidate
+    return ""
 
 
 def _extract_dimensions(prompt: str) -> tuple[float, float]:
