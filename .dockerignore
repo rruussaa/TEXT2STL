@@ -13,4 +13,4 @@ ollama-models/
 qwen3-pull*.log
 streamlit*.log
 training/out/
-
+datasets/
