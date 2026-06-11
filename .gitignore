@@ -9,4 +9,7 @@ evaluation/results.csv
 *.stl
 *.log
 training/out/
+<<<<<<< HEAD
 .venv/
+=======
+>>>>>>> ab5a832 (adding the traing data)
