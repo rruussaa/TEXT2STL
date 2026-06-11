@@ -78,34 +78,52 @@ Make a small hollow vase with a narrow neck.
 Make a simple pencil holder with six circular holes.
 ```
 
-## Run With Ollama
+## Run Locally With Ollama
 
-Start Ollama on the host and pull a coding model:
+This project is configured for a local OpenAI-compatible Ollama server using Qwen3 8B.
 
-```bash
-ollama pull qwen2.5-coder:7b
+On this setup, Ollama is installed under:
+
+```text
+D:\FMI\LLM_proekt\ollama-app
 ```
 
-Create `.env`:
+and models are stored under:
+
+```text
+D:\FMI\LLM_proekt\ollama-models
+```
+
+Start Ollama with:
+
+```powershell
+.\scripts\start_ollama_d.ps1
+```
+
+Then make sure the model is available:
+
+```bash
+D:\FMI\LLM_proekt\ollama-app\ollama.exe pull qwen3:8b
+```
+
+Create `.env` from `.env.example`:
 
 ```env
 LLM_MODE=openai_compatible
-LLM_BASE_URL=http://host.docker.internal:11434/v1
-LLM_API_KEY=ollama
-LLM_MODEL=qwen2.5-coder:7b
-```
-
-For local Windows runs outside Docker, use:
-
-```env
 LLM_BASE_URL=http://127.0.0.1:11434/v1
+LLM_API_KEY=ollama
+LLM_MODEL=qwen3:8b
 ```
 
-Then run:
+Install Python dependencies and run the UI:
 
-```bash
-docker compose up --build
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m streamlit run ui\streamlit_app.py
 ```
+
+Open `http://localhost:8501`.
 
 ## Run With OpenAI-Compatible API
 
