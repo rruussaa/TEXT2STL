@@ -1,0 +1,10 @@
+{"id":"stable_001","mode":"stable","prompt":"Make a 100 by 35 mm name plate with text AI LAB, 3 mm thick, with two screw holes.","expected_type":"name_plate"}
+{"id":"stable_002","mode":"stable","prompt":"Make a small TEXT2STL name plate 80 by 25 mm with rounded corners.","expected_type":"name_plate"}
+{"id":"stable_003","mode":"stable","prompt":"Make a 120 by 40 mm name plate that says ROOM 101 with four mounting holes.","expected_type":"name_plate"}
+{"id":"exp_001","mode":"experimental","prompt":"Make a 30 mm cube with a cylindrical hole through the center.","expected_type":"freeform"}
+{"id":"exp_002","mode":"experimental","prompt":"Make a simple pencil holder with six circular holes.","expected_type":"freeform"}
+{"id":"exp_003","mode":"experimental","prompt":"Make a small hollow vase with a narrow neck.","expected_type":"freeform"}
+{"id":"exp_004","mode":"experimental","prompt":"Make a simple airplane with wings and a tail.","expected_type":"freeform"}
+{"id":"exp_005","mode":"experimental","prompt":"Make a toy car with four wheels and a cabin.","expected_type":"freeform"}
+{"id":"exp_006","mode":"experimental","prompt":"Make a small house with a roof, door, and windows.","expected_type":"freeform"}
+{"id":"exp_007","mode":"experimental","prompt":"Make a desk lamp.","expected_type":"freeform"}

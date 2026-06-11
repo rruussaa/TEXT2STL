@@ -1,0 +1,4 @@
+id,mode,json_valid,code_safe,stl_generated,validation_pass,repair_attempts,time_sec,warnings,error
+stable_001,stable,true,,true,true,0,1.24,0,
+exp_001,experimental,,true,true,true,0,2.18,0,
+

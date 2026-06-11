@@ -1,0 +1,8 @@
+streamlit
+pydantic
+trimesh
+numpy
+openai
+pandas
+cadquery
+plotly

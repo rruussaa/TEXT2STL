@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.streamlit/
+outputs/*
+!outputs/.gitkeep
+evaluation/results.csv
+*.stl
+*.log
+
