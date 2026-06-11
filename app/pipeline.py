@@ -14,7 +14,7 @@ from app.config import get_settings
 from app.llm_client import LLMClient
 from app.schemas import model_to_dict, validate_name_plate_spec
 from app.safety import check_code_safety
-from app.validator import validate_stl
+from app.validator import validate_stl, validation_passed
 from experimental.local_fallback import cadquery_available, generate_local_experimental_stl
 from experimental.repair_loop import run_with_repair_loop
 from generators.name_plate import generate_name_plate
@@ -47,17 +47,6 @@ def parse_json_response(raw_text: str) -> dict[str, Any]:
         if start >= 0 and end > start:
             return json.loads(text[start : end + 1])
         raise
-
-
-def validation_passed(report: dict) -> bool:
-    return bool(
-        report.get("file_exists")
-        and report.get("file_size_bytes", 0) > 0
-        and report.get("triangle_count", 0) > 0
-        and report.get("volume_mm3", 0) > 0
-        and report.get("fits_printer")
-        and not report.get("warnings")
-    )
 
 
 def run_stable_pipeline(
@@ -106,9 +95,10 @@ def run_experimental_pipeline(
     user_prompt: str,
     output_path: str | None = None,
     client: LLMClient | None = None,
-    max_repairs: int = 2,
+    max_repairs: int | None = None,
 ) -> dict:
     client = client or LLMClient.from_env()
+    max_repairs = client.settings.llm_max_repairs if max_repairs is None else max_repairs
     output_path = output_path or make_output_path("experimental")
     result = {
         "mode": "experimental",

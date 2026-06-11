@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -32,6 +35,49 @@ EXPERIMENTAL_EXAMPLES = [
     "Make a simple pencil holder with six circular holes.",
     "Make a small open box 60 by 40 by 25 mm with 2 mm walls.",
 ]
+
+
+def _ollama_api_base(llm_base_url: str) -> str | None:
+    base_url = llm_base_url.rstrip("/")
+    if base_url.endswith("/v1"):
+        return base_url[:-3]
+    if "11434" in base_url:
+        return base_url
+    return None
+
+
+def _format_bytes(value: int) -> str:
+    if value <= 0:
+        return "0 B"
+    units = ("B", "KB", "MB", "GB")
+    size = float(value)
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
+        size /= 1024
+    return f"{size:.1f} GB"
+
+
+@st.cache_data(ttl=5, show_spinner=False)
+def _ollama_runtime_status(llm_base_url: str, configured_accelerator: str) -> str:
+    configured = configured_accelerator.upper() if configured_accelerator else "UNKNOWN"
+    api_base = _ollama_api_base(llm_base_url)
+    if not api_base:
+        return f"configured {configured}"
+
+    try:
+        with urlopen(f"{api_base}/api/ps", timeout=2.0) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return f"configured {configured}; Ollama status unavailable"
+
+    models = payload.get("models") or []
+    if not models:
+        return f"configured {configured}; no model loaded yet"
+
+    vram_bytes = sum(int(model.get("size_vram") or 0) for model in models)
+    active = "GPU active" if vram_bytes > 0 else "CPU active"
+    return f"{active}; configured {configured}; VRAM {_format_bytes(vram_bytes)}"
 
 
 def _set_prompt(prompt: str) -> None:
@@ -306,6 +352,7 @@ def main() -> None:
     with header_text:
         st.title("TEXT2STL Model")
         st.caption(f"LLM mode: {settings.llm_mode} | model: {settings.llm_model}")
+        st.caption(f"Runtime: {_ollama_runtime_status(settings.llm_base_url, settings.llm_accelerator)}")
     with header_photo:
         if header_image_path:
             st.image(str(header_image_path), width=130)
@@ -397,7 +444,16 @@ def main() -> None:
             suffix = "template" if attempt.get("template") else ("repair" if attempt.get("repair") else "llm")
             label = f"Attempt {attempt['attempt']} ({suffix}) - {'success' if attempt['success'] else 'failed'}"
             with st.expander(label, expanded=not attempt["success"]):
-                st.write({"code_safe": attempt.get("code_safe"), "safety_errors": attempt.get("safety_errors", []), "quality_ok": attempt.get("quality_ok"), "quality_issues": attempt.get("quality_issues", [])})
+                st.write(
+                    {
+                        "code_safe": attempt.get("code_safe"),
+                        "safety_errors": attempt.get("safety_errors", []),
+                        "quality_ok": attempt.get("quality_ok"),
+                        "quality_issues": attempt.get("quality_issues", []),
+                        "validation_pass": attempt.get("validation_pass"),
+                        "validation_warnings": attempt.get("validation", {}).get("warnings", []),
+                    }
+                )
                 st.code(attempt.get("code", ""), language="python")
                 if attempt.get("traceback"):
                     st.code(attempt["traceback"], language="text")

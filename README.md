@@ -8,10 +8,32 @@ CPU-only Docker run:
 docker compose up --build
 ```
 
+CPU mode uses shorter experimental LLM responses so local CPU generation is less likely to run into long Ollama timeouts:
+
+```text
+LLM_COMPACT_GENERATION=true
+LLM_EXPERIMENTAL_MAX_TOKENS=600
+LLM_REPAIR_MAX_TOKENS=450
+LLM_TIMEOUT_SEC=180
+LLM_ACCELERATOR=cpu
+LLM_MAX_REPAIRS=2
+```
+
 NVIDIA GPU Docker run:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+```
+
+GPU mode enables Docker GPU access for Ollama and restores the longer experimental generation settings:
+
+```text
+LLM_COMPACT_GENERATION=false
+LLM_EXPERIMENTAL_MAX_TOKENS=900
+LLM_REPAIR_MAX_TOKENS=900
+LLM_TIMEOUT_SEC=120
+LLM_ACCELERATOR=gpu
+LLM_MAX_REPAIRS=4
 ```
 
 GPU mode requires:
@@ -53,6 +75,28 @@ text2stl    Streamlit app
 ```
 
 The first run can take a while because Docker downloads the images and Ollama pulls the 5.2 GB Qwen3 model. Later runs reuse the cached model.
+
+It is normal for `ollama-pull` to exit with code `0` after the model is downloaded. The app should keep running as `text2stl` on `http://localhost:8501`.
+
+If Compose reports a stale container error after `ollama-pull` succeeds, stop the attached terminal with `Ctrl+C` and restart detached:
+
+```bash
+docker compose up -d
+```
+
+For GPU mode, restart detached with the GPU override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+```
+
+To confirm Ollama is using the GPU, check the Ollama logs and look for a GPU compute backend instead of `id=cpu`:
+
+```bash
+docker compose logs ollama
+```
+
+The Streamlit header also shows runtime status. Before a model is loaded it shows the configured mode, and after generation starts it reports whether Ollama is using CPU or GPU VRAM according to Ollama's `/api/ps` status.
 
 To stop:
 
@@ -161,6 +205,12 @@ LLM_MODE=openai_compatible
 LLM_BASE_URL=http://127.0.0.1:11434/v1
 LLM_API_KEY=ollama
 LLM_MODEL=qwen3:8b
+LLM_ACCELERATOR=cpu
+LLM_TIMEOUT_SEC=180
+LLM_COMPACT_GENERATION=true
+LLM_EXPERIMENTAL_MAX_TOKENS=600
+LLM_REPAIR_MAX_TOKENS=450
+LLM_MAX_REPAIRS=2
 ```
 
 Install Python dependencies and run the UI:
