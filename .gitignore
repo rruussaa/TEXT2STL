@@ -9,4 +9,3 @@ evaluation/results.csv
 *.stl
 *.log
 training/out/
-datasets/
